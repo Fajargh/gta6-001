@@ -1,8 +1,8 @@
 # gta6-001
 
-[![Play gta6-01](https://img.shields.io/badge/Play-gta6--01-2ec4b6?style=for-the-badge)](https://make.fun/bounty/gta6-01?ref=8cvj6bwy)
-[![Built with make.fun](https://img.shields.io/badge/Built_with-make.fun-ff5d8f?style=for-the-badge)](https://make.fun?ref=8cvj6bwy)
-[![Open in make.fun](https://img.shields.io/badge/Open_in-make.fun-ffd166?style=for-the-badge)](https://make.fun/bounty/gta6-01?ref=8cvj6bwy)
+[![make.fun · gta6-01](https://make.fun/badge/gta6-01.svg)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
+[![rank](https://make.fun/badge/gta6-01/Fajargh/gta6-001/rank.svg)](https://make.fun/bounty/gta6-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
+[![reward](https://make.fun/badge/gta6-01/Fajargh/gta6-001/reward.svg)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
 
 **Solmar Bay** — a sun-soaked open-world crime game built for make.fun's "Make GTA 6" bounty (gta6-01, $1,666 in USDC).
 
