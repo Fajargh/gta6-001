@@ -1,79 +1,97 @@
-// The screenshot scenes behind ?shot=start|play|end. Each one plays the real rules forward from a
-// fresh world for a fixed number of steps, steered by a simple autopilot (look ahead each way the
-// paddle could move, keep clear of blocks, chase the lowest coin when that is safe), so the frame
-// is what a short game really looks like and the same seed always gives the same frame.
-import { FIELD, PLAYER, STEP } from './config.js';
-import { EVENT_OVER, KIND_BLOCK } from './world.js';
-import { SCREEN_OVER, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
+// The screenshot scenes behind ?shot=chase|city|drive|mission. Each one sets
+// the real world to a staged state (same seed, same setup every time), runs
+// it forward a fixed number of steps, frames the camera, paints twice and
+// sets window.__shotReady — so the frame is what the game really looks like.
+import { STEP } from './config.js';
+import { enterCar, exitCar } from './player.js';
+import { ensureCrate } from './missions.js';
+import { spawnPoliceCruiser } from './vehicles.js';
+import { stepWorld } from './world.js';
 
-const START_SECONDS = 5;
-const PLAY_SECONDS = 26;
-const END_LIMIT_SECONDS = 600;
-/**
- * How far ahead, in seconds, the autopilot checks each way it could move: the play scene's pilot
- * looks well ahead and keeps all its lives; the end scene's looks only a moment ahead, so it is
- * caught out once the blocks speed up, as a hurried player is.
- */
-const HORIZON_PLAY = 0.7;
-const HORIZON_END = 0.25;
-const SAMPLE = 1 / 30;
-const DIRECTIONS = [0, -1, 1];
-/** Extra room, each side, it keeps between the paddle and a block. */
-const MARGIN = 10;
-
-/** Seconds until moving in `direction` (-1, 0, 1) runs the paddle into a block; Infinity when it never does. */
-function timeToHit(state, direction, horizon) {
-  const player = state.player;
-  for (let t = SAMPLE; t <= horizon; t += SAMPLE) {
-    const x = Math.min(FIELD.width - player.width, Math.max(0, player.x + direction * PLAYER.speed * t));
-    for (let index = 0; index < state.items.length; index += 1) {
-      const item = state.items[index];
-      if (!item.active || item.kind !== KIND_BLOCK) continue;
-      const y = item.y + item.speed * t;
-      if (y + item.height > player.y && y < player.y + player.height && item.x < x + player.width + MARGIN && item.x + item.width > x - MARGIN) return t;
-    }
-  }
-  return Infinity;
+function fakeInput(held = []) {
+  const keys = new Set(held);
+  return {
+    keys,
+    takeDrag() { return { x: 0, y: 0 }; },
+    takeActions() { return 0; },
+  };
 }
 
-/** Of the safe ways to move, the one toward the lowest coin (or the centre); else the one that is hit last. */
-function autopilot(state, horizon) {
-  const player = state.player;
-  let coin = null;
-  for (let index = 0; index < state.items.length; index += 1) {
-    const item = state.items[index];
-    if (item.active && item.kind !== KIND_BLOCK && (coin === null || item.y > coin.y)) coin = item;
-  }
-  const target = coin === null ? FIELD.width / 2 : coin.x + coin.width / 2;
-  const centre = player.x + player.width / 2;
-  const wanted = target > centre + 8 ? 1 : target < centre - 8 ? -1 : 0;
-  let best = wanted;
-  let bestTime = timeToHit(state, wanted, horizon);
-  for (let index = 0; index < DIRECTIONS.length && bestTime !== Infinity; index += 1) {
-    const time = timeToHit(state, DIRECTIONS[index], horizon);
-    if (time > bestTime) {
-      bestTime = time;
-      best = DIRECTIONS[index];
-    }
-  }
-  return best;
+function runSteps(world, seconds, held) {
+  const input = fakeInput(held);
+  for (let i = 0; i < seconds / STEP; i += 1) stepWorld(world, input, 0, STEP);
 }
 
 /**
- * Set `world` to the named scene (start, play or end; any other name is start) and return the
- * screen to draw over it and the best score to show.
+ * Stage the named scene on a fresh world. Returns the camera framing
+ * { eye: [x,y,z], look: [x,y,z] } for the shot.
  */
-export function stageShot(name, world) {
-  world.reset();
-  if (name !== 'play' && name !== 'end') {
-    for (let index = 0; index < START_SECONDS / STEP; index += 1) world.step(STEP, 0, true);
-    return { screen: SCREEN_TITLE, best: 0 };
+export function stageShot(name, world, renderer) {
+  const p = world.player;
+  if (name === 'chase') {
+    // Cover: Rex in the Comet GT, 3 wanted stars, two cruisers closing in.
+    const car = world.parked[0];
+    p.x = car.x;
+    p.z = car.z;
+    enterCar(p, car);
+    car.speed = 26;
+    car.heading = 0; // north up the central boulevard, clear sightlines
+    car.x = 0;
+    car.z = -60;
+    p.x = 0;
+    p.z = -60;
+    world.wanted = 3;
+    spawnPoliceCruiser(world.police, -10, -90, world.random);
+    spawnPoliceCruiser(world.police, 12, -84, world.random);
+    runSteps(world, 2.5, ['KeyW']);
+    // Three-quarter rear view: the Comet GT in frame with a cruiser behind it.
+    let cop = null;
+    let copD = Infinity;
+    for (const c of world.police.cars) {
+      const d = Math.hypot(c.x - p.x, c.z - p.z);
+      if (d < copD) {
+        copD = d;
+        cop = c;
+      }
+    }
+    const lookX = cop ? (p.x + cop.x) / 2 : p.x + 6;
+    const lookZ = cop ? (p.z + cop.z) / 2 : p.z + 10;
+    return { eye: [p.x - 13, 6, p.z - 16], look: [lookX, 1.5, lookZ] };
   }
-  const limit = name === 'end' ? END_LIMIT_SECONDS : PLAY_SECONDS;
-  const horizon = name === 'end' ? HORIZON_END : HORIZON_PLAY;
-  for (let index = 0; index < limit / STEP; index += 1) {
-    if (world.step(STEP, autopilot(world.state, horizon), false) & EVENT_OVER) break;
+  if (name === 'drive') {
+    // Rex cruising a boulevard in the Comet GT, traffic around him.
+    const car = world.parked[0];
+    enterCar(p, car);
+    car.speed = 24;
+    car.heading = 0;
+    car.x = -60;
+    car.z = 0;
+    p.x = -60;
+    p.z = 0;
+    runSteps(world, 2, ['KeyW']);
+    return { eye: [p.x - 12, 5.5, p.z - 13], look: [p.x + 8, 1.5, p.z + 12] };
   }
-  const over = world.state.lives === 0;
-  return { screen: over ? SCREEN_OVER : SCREEN_PLAY, best: world.state.score };
+  if (name === 'mission') {
+    // On foot on the north road, walking toward the crate and its gold beacon.
+    p.x = -60;
+    p.z = -120;
+    p.camYaw = Math.PI / 2; // facing east, down the road toward the market
+    world.missions.index = 1;
+    world.missions.stage = 'go';
+    ensureCrate(world.missions, world.scene);
+    runSteps(world, 1.5, ['KeyW']);
+    return { eye: [-76, 6.5, -120], look: [-28, 2, -115] };
+  }
+  // 'city' (default): Rex on foot on the central boulevard, looking down a
+  // street of towers, traffic and palms — no walking, so the frame stays put.
+  p.x = 0;
+  p.z = -42;
+  p.heading = 0;
+  p.camYaw = Math.PI;
+  p.mesh.position.set(p.x, 0, p.z);
+  p.mesh.rotation.y = 0;
+  runSteps(world, 0.4, []);
+  return { eye: [-13, 8, -66], look: [10, 2, 30] };
 }
+
+export { exitCar };

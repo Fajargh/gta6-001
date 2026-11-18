@@ -3,17 +3,95 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Block Dodger</title>
+<title>Solmar Bay — Open-World Crime Game</title>
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #11141b; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1220; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
   #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-  /* Read aloud, never shown: the status line screen readers announce. */
   #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .hidden { display: none !important; }
+  /* HUD */
+  #hud { position: fixed; inset: 0; pointer-events: none; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.7); }
+  #hud-top { position: absolute; top: 14px; left: 16px; right: 16px; display: flex; justify-content: space-between; align-items: flex-start; }
+  #stars { font-size: 30px; letter-spacing: 4px; color: #ffd166; }
+  #money { font-size: 26px; font-weight: 800; color: #7dff9b; }
+  #health-wrap { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  #health-bar { width: 180px; height: 14px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.5); border-radius: 7px; overflow: hidden; }
+  #health-fill { height: 100%; width: 100%; background: #22c55e; }
+  #health-text { font-weight: 700; }
+  #speed { font-size: 20px; font-weight: 700; text-align: right; margin-top: 6px; }
+  #minimap { position: absolute; top: 96px; right: 16px; width: 168px; height: 168px; border-radius: 50%; border: 3px solid rgba(255,255,255,.75); box-shadow: 0 2px 12px rgba(0,0,0,.5); background: #22303c; }
+  #mission-box { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); max-width: 520px; text-align: center; background: rgba(0,0,0,.45); border-radius: 10px; padding: 8px 18px; }
+  #mission-title { font-size: 15px; font-weight: 800; color: #ffd166; letter-spacing: .5px; }
+  #objective { font-size: 14px; margin-top: 2px; }
+  #toast { position: absolute; top: 34%; left: 50%; transform: translateX(-50%); font-size: 22px; font-weight: 800; color: #ffd166; opacity: 0; transition: opacity .3s; text-align: center; }
+  #prompt { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); font-size: 14px; background: rgba(0,0,0,.5); padding: 7px 14px; border-radius: 8px; white-space: nowrap; }
+  /* Overlays */
+  .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(5,10,25,.55); color: #fff; }
+  .panel { max-width: 640px; margin: 0 20px; background: rgba(8,14,30,.88); border: 1px solid rgba(255,209,102,.6); border-radius: 16px; padding: 34px 44px; text-align: center; box-shadow: 0 10px 60px rgba(0,0,0,.6); }
+  .panel h1 { margin: 0 0 4px; font-size: 52px; letter-spacing: 2px; color: #ffd166; }
+  .panel h2 { margin: 0 0 12px; font-size: 30px; color: #ffd166; }
+  .panel .sub { font-size: 17px; color: #7dd3fc; font-weight: 700; margin-bottom: 14px; }
+  .panel p { font-size: 15px; line-height: 1.55; color: #e2e8f0; }
+  .panel .keys { font-size: 13.5px; color: #cbd5e1; background: rgba(255,255,255,.06); border-radius: 8px; padding: 10px 14px; text-align: left; line-height: 1.8; }
+  .panel .cta { margin-top: 18px; font-size: 19px; font-weight: 800; color: #7dff9b; }
+  .panel .fine { font-size: 12px; color: #94a3b8; margin-top: 12px; }
 </style>
 </head>
 <body>
-<canvas id="game" aria-label="Block Dodger: move the paddle left and right to dodge falling blocks and catch coins"></canvas>
+<canvas id="game" aria-label="Solmar Bay: an open-world crime game. Drive, steal cars, do jobs for Vera Cruz, and lose the police."></canvas>
 <p id="status" role="status" aria-live="polite"></p>
+
+<div id="hud" class="hidden">
+  <div id="hud-top">
+    <div>
+      <div id="stars">☆☆☆☆☆</div>
+      <div id="health-wrap"><span>❤</span><div id="health-bar"><div id="health-fill"></div></div><span id="health-text">100</span></div>
+    </div>
+    <div>
+      <div id="money">$0</div>
+      <div id="speed"></div>
+    </div>
+  </div>
+  <div id="mission-box"><div id="mission-title">Job 1 — First Wheels</div><div id="objective"></div></div>
+  <canvas id="minimap" width="168" height="168"></canvas>
+  <div id="toast"></div>
+  <div id="prompt"></div>
+</div>
+
+<div id="overlay-title" class="overlay">
+  <div class="panel">
+    <h1>SOLMAR BAY</h1>
+    <div class="sub">Sun, sea, sirens — an open-world crime game</div>
+    <p>Rex Marlowe is out of the harbour lockup and owes fixer <b>Vera Cruz</b> three jobs.
+    Steal cars, run packages, and shake the Solmar PD across a living coastal city —
+    traffic, pedestrians, palms, the marina, and five stars of heat.</p>
+    <div class="keys">
+      <b>WASD</b> move / drive &nbsp;·&nbsp; <b>Shift</b> run &nbsp;·&nbsp; <b>drag mouse</b> look<br>
+      <b>E</b> get in / out of a car &nbsp;·&nbsp; <b>Space</b> handbrake<br>
+      <b>F</b> punch &nbsp;·&nbsp; <b>click</b> shoot &nbsp;·&nbsp; <b>P / Esc</b> pause &nbsp;·&nbsp; <b>M</b> mute
+    </div>
+    <div class="cta">Press Space or click to start</div>
+    <div class="fine">Progress (money, jobs, position) saves in this browser. A wholly original game — no Rockstar content.</div>
+  </div>
+</div>
+
+<div id="overlay-pause" class="overlay hidden">
+  <div class="panel">
+    <h2>Paused</h2>
+    <p>Solmar Bay waits for no one — except right now.</p>
+    <div class="cta">Press P to resume</div>
+  </div>
+</div>
+
+<div id="overlay-wasted" class="overlay hidden">
+  <div class="panel">
+    <h2>WASTED</h2>
+    <p>The Solmar PD finally caught up with Rex. Your money stays saved — get back out there.</p>
+    <div class="cta">Press Space to try again</div>
+  </div>
+</div>
+
+<script src="./vendor/three.min.js"></script>
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>

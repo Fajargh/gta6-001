@@ -1,3 +1,7 @@
+// Solmar Bay (gta6-01): a 3D open-world crime game — a coastal city, cars to
+// steal and drive, traffic, pedestrians, police chases, three story missions,
+// a HUD with minimap, and procedural sound. Static files under game/ (three.js
+// vendored at game/vendor/three.min.js), screenshots in screenshots/.
 // A working gta6-01 entry (Node 22, standard library only): the game is this directory's
 // game/ folder, plain static files a desktop browser loads offline (game/index.html and its ES
 // modules, no library and no network request), and the program hands it in. It copies game/ and
